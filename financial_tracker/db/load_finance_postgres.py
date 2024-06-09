@@ -5,7 +5,7 @@ import os
 import sys
 import pandas as pd
 from sqlalchemy import create_engine
-from banking.db.config import POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DBNAME, HOST, POSTGRES_SCHEMA
+from financial_tracker.db.config import POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DBNAME, HOST, POSTGRES_SCHEMA
 
 # Asks for path to folder
 folder = '/home/miros/DataOps/banking/banking/data'
