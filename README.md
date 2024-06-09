@@ -2,12 +2,12 @@
 
 > Reload data 
 
-    Run `tracker.py`
+Run `tracker.py`
 
 >  Data Visualization
 
-    - Login to [AWS Quicksight dashboard](https://aws.amazon.com/QuickSight/)
-    - Refresh dataset or schedule automatic refreshes
+- Login to [AWS Quicksight dashboard](https://aws.amazon.com/QuickSight/)
+- Refresh dataset or schedule automatic refreshes
 
 > [!NOTE]
 > `manifest.json` is used to connect Quicksight to AWS resources
