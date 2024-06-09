@@ -1,6 +1,5 @@
 import pandas as pd
 import os
-
 import boto3
 
 from keywords import keyword_groups

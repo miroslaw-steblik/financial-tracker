@@ -2,7 +2,8 @@
 
 > Reload data 
 
-Run `tracker.py`
+- Run `tracker.py`
+- Keep `keywords.py` and keywords_groups up-to-date 
 
 >  Data Visualization
 
