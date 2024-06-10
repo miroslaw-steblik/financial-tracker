@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import boto3
+import re
 
 from keywords import keyword_groups
 
@@ -32,6 +33,7 @@ post_columns = {
     'Amount': 'float64',
     'Type': 'object',
     'Category': 'object',
+    'Subcategory': 'object',
 }
 
 def test_no_duplicates(df):
@@ -119,22 +121,25 @@ def categorize_transaction(description):
     # Convert description to lowercase for case-insensitive matching
     description_lower = description.lower()
     
-    # Iterate through keywords and check if any keyword matches the description
-    for group, keywords in keyword_groups.items():
-        for keyword in keywords:
-            if keyword.lower() in description_lower:
-                return group
+    # Iterate through categories and subcategories
+    for category, subcategories in keyword_groups.items():
+        for subcategory, keywords in subcategories.items():
+            # Check if any keyword matches the description
+            for keyword in keywords:
+                # Use regex to match whole words only
+                if re.search(r'\b' + keyword.lower() + r'\b', description_lower):
+                    return category, subcategory
     
-    # If no keyword matches, return 'Other'
-    return 'Other'
+    # If no keyword matches, return 'None' and 'None' as subcategory
+    return 'None', 'None'
 
 
 def combine_data():
     all_df = pd.concat([bdf,mdf])
     all_df = all_df.sort_values(by='Date',ascending=False)
     all_df = all_df.rename_axis('index')
-    # Apply the categorization function to create a new column with grouped categories
-    all_df['Category'] = all_df['Description'].apply(categorize_transaction)
+    # Apply the categorization function to create new columns with grouped categories and subcategories
+    all_df['Category'], all_df['Subcategory'] = zip(*all_df['Description'].apply(categorize_transaction))
 
     # Post-transformation validation
     validate_columns(all_df, post_columns)
