@@ -19,6 +19,10 @@ def validate_columns(df, columns):
         assert column in df.columns, f"Expected column '{column}' not found in DataFrame"
         assert df[column].dtype == dtype, f"Expected '{column}' to have dtype '{dtype}'"
         assert df[column].isnull().sum() == 0, f"Found null values in '{column}'"
+        assert df[column].notna().all(), f"Found NaN values in '{column}'"
+        assert not df[column].eq('').any(), f"Found empty strings in '{column}'"
+        assert not df[column].eq(' ').any(), f"Found whitespace strings in '{column}'"
+        assert not df[column].eq('nan').any(), f"Found 'nan' strings in '{column}'"
 
 
 pre_columns = {
