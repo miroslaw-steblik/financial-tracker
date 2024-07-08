@@ -2,16 +2,38 @@ import pandas as pd
 import os
 import boto3
 import re
+import psycopg2
+from psycopg2.extras import execute_batch
 
-from keywords import keyword_groups
+from config import POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DBNAME, HOST
+
+from keywords import keyword_groups, description_mapping
 
 barclays_path = "./data/barclays"
 mbna_path = "./data/mbna"
-combined_df_path = "./data/financial_tracker.csv"
+combined_file_path = "./data/financial_tracker.csv"
+
+#--------------------- postgres -----------------------------------------------#
+conn_params_dic = {
+    "host"      : HOST,
+    "database"  : POSTGRES_DBNAME,
+    "user"      : POSTGRES_USER,
+    "password"  : POSTGRES_PASSWORD
+}
+
 
 #--------------------- s3 ----------------------------------------------------#
 bucket_name = 'finance-a'
 key = 'monthly-budget/financial_tracker.csv'
+
+""" config details for S3 are in ~/.aws/credentials """
+
+def load_s3():
+    s3 = boto3.client('s3')
+
+    s3.upload_file(combined_file_path, bucket_name, key)
+    print(f"File uploaded to s3://{bucket_name}/{key}")
+    return all_df
 
 #--------------------- data validation --------------------------------------------#
 def validate_columns(df, columns):
@@ -81,7 +103,7 @@ def barclays():
     # Post-transformation validation
     validate_columns(bdf, pre_columns)
 
-    print(bdf.info())
+    #print(bdf.info())
     return bdf
     
 
@@ -114,10 +136,11 @@ def mbna():
     mdf['Type'] = mdf['Amount'].apply(lambda x: 'Outflow' if x < 0 else 'Inflow')
     mdf['Date'] = pd.to_datetime(mdf['Date'],dayfirst=True)
 
+
     # Post-transformation validation
     validate_columns(mdf, pre_columns)
 
-    print(mdf.info())
+    #print(mdf.info())
     return mdf
 
 
@@ -145,28 +168,78 @@ def combine_data():
     # Apply the categorization function to create new columns with grouped categories and subcategories
     all_df['Category'], all_df['Subcategory'] = zip(*all_df['Description'].apply(categorize_transaction))
 
+    # remove entries "DIRECT DEBIT PAYMENT TO" from description
+    condition = (
+    all_df['Category'].eq('Financials') & 
+    (all_df['Description'].str.contains('DIRECT DEBIT PAYMENT') | all_df['Description'].str.contains('PAYMENT RECEIVED - THAN'))
+    )
+    all_df = all_df[~condition]
+
+    all_df['Description'] = all_df['Description'].str.strip()
+    # Normalize the 'description' column using the description_mapping dictionary
+    all_df['Description'] = all_df['Description'].replace(description_mapping)
+
     # Post-transformation validation
     validate_columns(all_df, post_columns)
 
+    print(description_mapping)
     print(all_df.info())
     return all_df
 
 def save_all():
-    all_df.to_csv(combined_df_path, index=False)
+    all_df.to_csv(combined_file_path, index=False)
     print()
-    print("Data saved to local file: steblik_finance.csv")
+    print("Data saved to local file: financial_tracker.csv")
     return all_df
 
-#------------------------------------------------------------------------------#
 
-""" config details for S3 are in ~/.aws/credentials """
 
-def load_s3():
-    s3 = boto3.client('s3')
 
-    s3.upload_file(combined_df_path, bucket_name, key)
-    print(f"File uploaded to s3://{bucket_name}/{key}")
-    return all_df
+# ----------------------------- load to postgres ---------------------------------#
+
+def load_data_to_postgres(df):
+    
+    # Connect to the PostgreSQL database
+    conn = psycopg2.connect(**conn_params_dic)
+    cur = conn.cursor()
+    
+    cur.execute("DROP TABLE IF EXISTS financial_tracker CASCADE;")
+
+    # unqoted names are case-insensitive, will be converted to lowercase
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS financial_tracker (
+            Date date,
+            Description text,
+            Amount float,
+            Type text,
+            Category text,
+            Subcategory text
+        )
+    """)
+    
+
+    # Define the INSERT statement, lowercase column names to match the PostgreSQL table
+    insert_stmt = """
+    INSERT INTO financial_tracker (date, description, amount, type, category, subcategory)
+    VALUES (%s, %s, %s, %s, %s, %s)
+    """
+
+
+    # Prepare data for insertion
+    data_for_insert = [
+        (row['Date'], row['Description'], row['Amount'], row['Type'], row['Category'], row['Subcategory'])
+        for index, row in df.iterrows()
+    ]
+
+    # Execute the INSERT statement in batches
+    execute_batch(cur, insert_stmt, data_for_insert, page_size=100)
+
+    # Commit changes and close the connection
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    print("CSV data has been loaded into PostgreSQL using INSERT statements")
 
 
 #-------------------- main -----------------------------------------------------#
@@ -174,7 +247,7 @@ if __name__== "__main__":
     bdf = barclays()
     mdf = mbna()
     all_df = combine_data()
-    save_all()
-    load_s3()
+    all_df = save_all()
+    load_data_to_postgres(all_df)
  
 
