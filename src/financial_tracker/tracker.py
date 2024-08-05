@@ -157,8 +157,6 @@ def combine_data():
     # Post-transformation validation
     validate_columns(all_df, post_columns)
 
-    print(description_mapping)
-    print(all_df.info())
     return all_df
 
 def save_all():
