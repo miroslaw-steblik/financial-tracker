@@ -1,39 +1,14 @@
 import pandas as pd
 import os
-import boto3
+
 import re
-import psycopg2
-from psycopg2.extras import execute_batch
 
-from config import POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DBNAME, HOST
-
-from keywords import keyword_groups, description_mapping
+from utils.keywords import keyword_groups, description_mapping
+from db.load_to_pg import load_data_to_postgres
 
 barclays_path = "./data/barclays"
 mbna_path = "./data/mbna"
 combined_file_path = "./data/financial_tracker.csv"
-
-#--------------------- postgres -----------------------------------------------#
-conn_params_dic = {
-    "host"      : HOST,
-    "database"  : POSTGRES_DBNAME,
-    "user"      : POSTGRES_USER,
-    "password"  : POSTGRES_PASSWORD
-}
-
-
-#--------------------- s3 ----------------------------------------------------#
-bucket_name = 'finance-a'
-key = 'monthly-budget/financial_tracker.csv'
-
-""" config details for S3 are in ~/.aws/credentials """
-
-def load_s3():
-    s3 = boto3.client('s3')
-
-    s3.upload_file(combined_file_path, bucket_name, key)
-    print(f"File uploaded to s3://{bucket_name}/{key}")
-    return all_df
 
 #--------------------- data validation --------------------------------------------#
 def validate_columns(df, columns):
@@ -195,51 +170,7 @@ def save_all():
 
 
 
-# ----------------------------- load to postgres ---------------------------------#
 
-def load_data_to_postgres(df):
-    
-    # Connect to the PostgreSQL database
-    conn = psycopg2.connect(**conn_params_dic)
-    cur = conn.cursor()
-    
-    cur.execute("DROP TABLE IF EXISTS financial_tracker CASCADE;")
-
-    # unqoted names are case-insensitive, will be converted to lowercase
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS financial_tracker (
-            Date date,
-            Description text,
-            Amount float,
-            Type text,
-            Category text,
-            Subcategory text
-        )
-    """)
-    
-
-    # Define the INSERT statement, lowercase column names to match the PostgreSQL table
-    insert_stmt = """
-    INSERT INTO financial_tracker (date, description, amount, type, category, subcategory)
-    VALUES (%s, %s, %s, %s, %s, %s)
-    """
-
-
-    # Prepare data for insertion
-    data_for_insert = [
-        (row['Date'], row['Description'], row['Amount'], row['Type'], row['Category'], row['Subcategory'])
-        for index, row in df.iterrows()
-    ]
-
-    # Execute the INSERT statement in batches
-    execute_batch(cur, insert_stmt, data_for_insert, page_size=100)
-
-    # Commit changes and close the connection
-    conn.commit()
-    cur.close()
-    conn.close()
-
-    print("CSV data has been loaded into PostgreSQL using INSERT statements")
 
 
 #-------------------- main -----------------------------------------------------#

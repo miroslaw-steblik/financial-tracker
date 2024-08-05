@@ -1,4 +1,13 @@
 manifest.json
 config.py
-financial_tracker/data
 keywords.py
+
+
+.venv/
+data/
+
+# egg-info files
+*.egg-info/
+
+__pycache__/
+
