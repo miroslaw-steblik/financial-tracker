@@ -45,7 +45,7 @@ def load_data_to_postgres(df):
 
     # Prepare data for insertion
     data_for_insert = [
-        (row['Date'], row['Description'], row['Amount'], row['Type'], row['Category'], row['Subcategory'])
+        (row['date'], row['description'], row['amount'], row['type'], row['category'], row['subcategory'])
         for index, row in df.iterrows()
     ]
 
